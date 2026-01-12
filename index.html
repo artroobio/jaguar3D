@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>360° Gym Equipment Viewer (Demo Mode)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #222; /* Dark mode for better contrast */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+        }
+
+        .viewer-container {
+            position: relative;
+            width: 800px;
+            max-width: 90%;
+            aspect-ratio: 16/9; /* Adjusted for the car demo */
+            background: #000;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: grab;
+        }
+
+        .viewer-container:active { cursor: grabbing; }
+
+        canvas { display: block; width: 100%; height: 100%; }
+
+        .loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+
+        .loader-bar {
+            width: 200px;
+            height: 4px;
+            background: #444;
+            margin-top: 10px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loader-progress {
+            width: 0%;
+            height: 100%;
+            background: #ff6b00; /* Orange to match the car */
+            transition: width 0.1s;
+        }
+
+        .instruction {
+            margin-top: 15px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="viewer-container" id="js-viewer">
+        <canvas id="js-canvas"></canvas>
+        <div class="loader" id="js-loader">
+            <div>Loading 73 Frames...</div>
+            <div class="loader-bar">
+                <div class="loader-progress" id="js-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="instruction">Drag to Rotate • Inertia Enabled</div>
+
+    <script>
+        class Rotator360 {
+            constructor(canvasId, totalFrames) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.totalFrames = totalFrames;
+                
+                this.images = [];
+                this.loadedCount = 0;
+                this.currentFrame = 0;
+                this.isDragging = false;
+                this.startX = 0;
+                
+                // Physics Config
+                this.velocity = 0;
+                this.friction = 0.95; // Smoother slide
+                this.sensitivity = 0.25;
+
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                this.loadImages();
+                this.addInteractions();
+                this.animate();
+            }
+
+            loadImages() {
+                const loaderEl = document.getElementById('js-loader');
+                const progressEl = document.getElementById('js-progress');
+
+                // Using a public demo sequence of an Orange SUV (73 frames)
+                const baseUrl = "https://scaleflex.cloudimg.io/v7/demo/suv-orange-car-360/orange-";
+
+                for (let i = 1; i <= this.totalFrames; i++) {
+                    const img = new Image();
+                    // This demo server uses standard numbering: orange-1.jpg, orange-2.jpg...
+                    img.src = `${baseUrl}${i}.jpg`;
+                    
+                    img.onload = () => {
+                        this.loadedCount++;
+                        const pct = Math.floor((this.loadedCount / this.totalFrames) * 100);
+                        progressEl.style.width = `${pct}%`;
+
+                        if (this.loadedCount === this.totalFrames) {
+                            loaderEl.style.opacity = 0;
+                            this.draw();
+                        }
+                    };
+                    this.images.push(img);
+                }
+            }
+
+            resize() {
+                // High-DPI scaling
+                const dpr = window.devicePixelRatio || 1;
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                
+                this.canvas.width = rect.width * dpr;
+                this.canvas.height = rect.height * dpr;
+                
+                this.ctx.scale(dpr, dpr);
+                
+                // Store CSS size for calculations
+                this.cssWidth = rect.width;
+                this.cssHeight = rect.height;
+
+                if (this.images[0]) this.draw();
+            }
+
+            draw() {
+                let frameIndex = Math.floor(this.currentFrame) % this.totalFrames;
+                if (frameIndex < 0) frameIndex += this.totalFrames;
+                
+                const img = this.images[frameIndex];
+                if (img) {
+                    this.ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
+                    
+                    // "Contain" logic: keep aspect ratio
+                    const scale = Math.min(this.cssWidth / img.width, this.cssHeight / img.height);
+                    const x = (this.cssWidth / 2) - (img.width / 2) * scale;
+                    const y = (this.cssHeight / 2) - (img.height / 2) * scale;
+
+                    this.ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                }
+            }
+
+            animate() {
+                if (!this.isDragging) {
+                    this.velocity *= this.friction;
+                    if (Math.abs(this.velocity) < 0.01) this.velocity = 0;
+                }
+                
+                if (this.velocity !== 0) {
+                    this.currentFrame -= this.velocity;
+                    this.draw();
+                }
+                requestAnimationFrame(() => this.animate());
+            }
+
+            addInteractions() {
+                const handleStart = (x) => {
+                    this.isDragging = true;
+                    this.startX = x;
+                    this.velocity = 0;
+                    this.canvas.style.cursor = 'grabbing';
+                };
+
+                const handleMove = (x) => {
+                    if (!this.isDragging) return;
+                    const delta = x - this.startX;
+                    this.velocity = delta * this.sensitivity;
+                    this.startX = x;
+                };
+
+                const handleEnd = () => {
+                    this.isDragging = false;
+                    this.canvas.style.cursor = 'grab';
+                };
+
+                // Mouse
+                this.canvas.addEventListener('mousedown', e => handleStart(e.clientX));
+                window.addEventListener('mousemove', e => handleMove(e.clientX));
+                window.addEventListener('mouseup', handleEnd);
+
+                // Touch
+                this.canvas.addEventListener('touchstart', e => handleStart(e.touches[0].clientX));
+                window.addEventListener('touchmove', e => handleMove(e.touches[0].clientX));
+                window.addEventListener('touchend', handleEnd);
+            }
+        }
+
+        // Initialize with 73 frames (the size of the car demo)
+        const viewer = new Rotator360('js-canvas', 73);
+    </script>
+</body>
+</html>
