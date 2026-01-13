@@ -40,7 +40,12 @@
                If not found, it falls back to other heavy fonts.
             */
             font-family: "Impact", "Haettenschweiler", "Franklin Gothic Bold", "Charcoal", "Helvetica Inserat", "Bitstream Vera Sans Bold", "Arial Black", sans-serif;
-            font-weight: normal; /* Impact is already bold by default */
+            
+            /* CHANGED: Forced 900 weight. 
+               This ensures that if mobile devices fall back to standard fonts (like Helvetica/Roboto),
+               they render as "Black/Extra Bold" rather than thin. */
+            font-weight: 900; 
+            
             font-style: normal;
             
             /* Responsive sizing logic:
@@ -68,6 +73,9 @@
                 /* Impact is narrow, so we can go very high on VW to fill the screen width */
                 font-size: 24vw; 
                 line-height: 0.85;
+                
+                /* Tighter spacing for mobile to prevent overflow if fallback font is wider than Impact */
+                letter-spacing: -0.02em;
             }
         }
     </style>
