@@ -3,216 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>360° Gym Equipment Viewer (Demo Mode)</title>
+    <title>Jaguar Fitness</title>
+    
+    <!-- 1. GOOGLE FONTS: KANIT (Extra Bold) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@900&display=swap" rel="stylesheet">
+
     <style>
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background-color: #222; /* Dark mode for better contrast */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            color: white;
-        }
-
-        .viewer-container {
-            position: relative;
-            width: 800px;
-            max-width: 90%;
-            aspect-ratio: 16/9; /* Adjusted for the car demo */
-            background: #000;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            border-radius: 8px;
-            overflow: hidden;
-            cursor: grab;
-        }
-
-        .viewer-container:active { cursor: grabbing; }
-
-        canvas { display: block; width: 100%; height: 100%; }
-
-        .loader {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            pointer-events: none;
-            transition: opacity 0.3s;
-            z-index: 10;
-        }
-
-        .loader-bar {
-            width: 200px;
-            height: 4px;
-            background: #444;
-            margin-top: 10px;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .loader-progress {
-            width: 0%;
+        /* --- GLOBAL STYLES --- */
+        html {
+            background-color: #111; 
             height: 100%;
-            background: #ff6b00; /* Orange to match the car */
-            transition: width 0.1s;
+            overflow: hidden;
         }
 
-        .instruction {
-            margin-top: 15px;
-            color: #888;
-            font-size: 0.9rem;
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex; 
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; 
+            background-color: transparent;
+        }
+
+        /* --- TEXT STYLES --- */
+        h2 {
+            display: block;
+            text-align: center;
+            
+            /* Reverted to Solid Color */
+            color: #f4b63f;
+            
+            /* Font Settings */
+            font-family: 'Kanit', sans-serif;
+            font-weight: 900; 
+            font-style: italic; /* Italic adds momentum/speed often used in fitness */
+            
+            /* Adjusted size for two lines */
+            font-size: clamp(3rem, 12vw, 18vh); 
+            margin: 0;
+            opacity: 0; /* Hidden initially, VFX script reveals it */
+            line-height: 0.9; /* Tighter line height for impact */
+            text-transform: uppercase; 
+            padding: 0.2em;
+            letter-spacing: 0.05em;
         }
     </style>
 </head>
 <body>
 
-    <div class="viewer-container" id="js-viewer">
-        <canvas id="js-canvas"></canvas>
-        <div class="loader" id="js-loader">
-            <div>Loading 73 Frames...</div>
-            <div class="loader-bar">
-                <div class="loader-progress" id="js-progress"></div>
-            </div>
-        </div>
-    </div>
+    <!-- MAIN TEXT -->
+    <section>
+        <h2>Jaguar<br>Fitness</h2>
+    </section>
 
-    <div class="instruction">Drag to Rotate • Inertia Enabled</div>
+    <!-- --- VFX TEXT SCRIPT --- -->
+    <script type="module">
+        import { VFX } from "https://esm.sh/@vfx-js/core@0.5.2";
 
-    <script>
-        class Rotator360 {
-            constructor(canvasId, totalFrames) {
-                this.canvas = document.getElementById(canvasId);
-                this.ctx = this.canvas.getContext('2d');
-                this.totalFrames = totalFrames;
-                
-                this.images = [];
-                this.loadedCount = 0;
-                this.currentFrame = 0;
-                this.isDragging = false;
-                this.startX = 0;
-                
-                // Physics Config
-                this.velocity = 0;
-                this.friction = 0.95; // Smoother slide
-                this.sensitivity = 0.25;
+        const shader = `
+        precision highp float;
+        uniform sampler2D src;
+        uniform vec2 resolution;
+        uniform vec2 offset;
+        uniform float time;
+        uniform float enterTime;
+        uniform float leaveTime;
+        uniform int mode;
+        uniform float width;
+        uniform float layers;
+        uniform float speed;
+        uniform float delay;
 
-                this.resize();
-                window.addEventListener('resize', () => this.resize());
-                this.loadImages();
-                this.addInteractions();
-                this.animate();
-            }
+        #define W width
+        #define LAYERS layers
 
-            loadImages() {
-                const loaderEl = document.getElementById('js-loader');
-                const progressEl = document.getElementById('js-progress');
-
-                // Using a public demo sequence of an Orange SUV (73 frames)
-                const baseUrl = "https://scaleflex.cloudimg.io/v7/demo/suv-orange-car-360/orange-";
-
-                for (let i = 1; i <= this.totalFrames; i++) {
-                    const img = new Image();
-                    // This demo server uses standard numbering: orange-1.jpg, orange-2.jpg...
-                    img.src = `${baseUrl}${i}.jpg`;
-                    
-                    img.onload = () => {
-                        this.loadedCount++;
-                        const pct = Math.floor((this.loadedCount / this.totalFrames) * 100);
-                        progressEl.style.width = `${pct}%`;
-
-                        if (this.loadedCount === this.totalFrames) {
-                            loaderEl.style.opacity = 0;
-                            this.draw();
-                        }
-                    };
-                    this.images.push(img);
-                }
-            }
-
-            resize() {
-                // High-DPI scaling
-                const dpr = window.devicePixelRatio || 1;
-                const rect = this.canvas.parentElement.getBoundingClientRect();
-                
-                this.canvas.width = rect.width * dpr;
-                this.canvas.height = rect.height * dpr;
-                
-                this.ctx.scale(dpr, dpr);
-                
-                // Store CSS size for calculations
-                this.cssWidth = rect.width;
-                this.cssHeight = rect.height;
-
-                if (this.images[0]) this.draw();
-            }
-
-            draw() {
-                let frameIndex = Math.floor(this.currentFrame) % this.totalFrames;
-                if (frameIndex < 0) frameIndex += this.totalFrames;
-                
-                const img = this.images[frameIndex];
-                if (img) {
-                    this.ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-                    
-                    // "Contain" logic: keep aspect ratio
-                    const scale = Math.min(this.cssWidth / img.width, this.cssHeight / img.height);
-                    const x = (this.cssWidth / 2) - (img.width / 2) * scale;
-                    const y = (this.cssHeight / 2) - (img.height / 2) * scale;
-
-                    this.ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                }
-            }
-
-            animate() {
-                if (!this.isDragging) {
-                    this.velocity *= this.friction;
-                    if (Math.abs(this.velocity) < 0.01) this.velocity = 0;
-                }
-                
-                if (this.velocity !== 0) {
-                    this.currentFrame -= this.velocity;
-                    this.draw();
-                }
-                requestAnimationFrame(() => this.animate());
-            }
-
-            addInteractions() {
-                const handleStart = (x) => {
-                    this.isDragging = true;
-                    this.startX = x;
-                    this.velocity = 0;
-                    this.canvas.style.cursor = 'grabbing';
-                };
-
-                const handleMove = (x) => {
-                    if (!this.isDragging) return;
-                    const delta = x - this.startX;
-                    this.velocity = delta * this.sensitivity;
-                    this.startX = x;
-                };
-
-                const handleEnd = () => {
-                    this.isDragging = false;
-                    this.canvas.style.cursor = 'grab';
-                };
-
-                // Mouse
-                this.canvas.addEventListener('mousedown', e => handleStart(e.clientX));
-                window.addEventListener('mousemove', e => handleMove(e.clientX));
-                window.addEventListener('mouseup', handleEnd);
-
-                // Touch
-                this.canvas.addEventListener('touchstart', e => handleStart(e.touches[0].clientX));
-                window.addEventListener('touchmove', e => handleMove(e.touches[0].clientX));
-                window.addEventListener('touchend', handleEnd);
-            }
+        vec4 readTex(vec2 uv) {
+          if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) return vec4(0);
+          return texture(src, uv);
         }
 
-        // Initialize with 73 frames (the size of the car demo)
-        const viewer = new Rotator360('js-canvas', 73);
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(4859., 3985.))) * 3984.);
+        }
+
+        vec3 hsv2rgb(vec3 c) {
+          vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+          vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+          return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+        }
+
+        float sdBox(vec2 p, float r) {
+          vec2 q = abs(p) - r;
+          return min(length(q), max(q.y, q.x));
+        }
+
+        float toRangeT(vec2 p, float scale) {
+          // Mode 2 (Radial) hardcoded for simplicity in this version
+          return length(p) / scale; 
+        }
+
+        vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
+          vec2 pc = pi + .5;
+          vec2 uvc = pc / scale;
+          uvc.y /= resolution.y / resolution.x;
+          uvc = uvc * 0.5 + 0.5;
+          if (uvc.x < 0. || uvc.x > 1. || uvc.y < 0. || uvc.y > 1.) return vec4(0);
+          
+          float alpha = smoothstep(.0, .1, texture2D(src, uvc, 3.).a);
+          vec4 color = vec4(hsv2rgb(vec3((pc.x * 13. / pc.y * 17.) * 0.3, 1, 1)), 1);
+          float x = toRangeT(pi, scale);
+          float n = hash(pi);
+          float anim = smoothstep(W * 2., .0, abs(x + n * W - t));
+          color *= anim;    
+          color *= mix(1., clamp(.3 / abs(sdBox(p - pc, .5)), 0., 10.), edge * pow(anim, 10.)); 
+          return color * alpha;
+        }
+
+        vec4 cellsColor(vec2 p, float scale, float t) {
+          vec2 pi = floor(p);
+          vec2 d = vec2(0, 1);
+          vec4 cc = vec4(0);
+          cc += cell(p, pi, scale, t, .2) * 4.;
+          cc += cell(p, pi + d.xy, scale, t, .9);
+          cc += cell(p, pi - d.xy, scale, t, .9);
+          cc += cell(p, pi + d.yx, scale, t, .9);
+          cc += cell(p, pi - d.yx, scale, t, .9);
+          return cc / 8.;
+        }
+
+        vec4 draw(vec2 uv, vec2 p, float t, float scale) {
+          vec4 c = readTex(uv);
+          vec2 pi = floor(p * scale);
+          float n = hash(pi);
+          t = t * (1. + W * 4.) - W * 2.; 
+          float x = toRangeT(pi, scale);
+          float a1 = smoothstep(t, t - W, x + n * W);      
+          c *= a1;
+          c += cellsColor(p * scale, scale, t) * 1.5;
+          return c;
+        }
+
+        void main() {
+          vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+          vec2 p = uv * 2. - 1.;
+          p.y *= resolution.y / resolution.x;
+          
+          // Simple entry animation
+          float t = clamp((enterTime - delay) * speed, 0., 1.);  
+          t = (fract(t * .99999) - 0.5) + 0.5;        
+          
+          for (float i = 0.; i < LAYERS; i++) {
+            float s = cos(i) * 7.3 + 10.; 
+            gl_FragColor += draw(uv, p, t, abs(s));
+          }
+          gl_FragColor /= LAYERS;  
+          gl_FragColor *= smoothstep(0., 0.01, t);
+        }
+        `;
+
+        const vfx = new VFX();
+
+        for (const e of document.querySelectorAll('h2')) {      
+          vfx.add(e, { 
+            shader, 
+            overflow: 300, 
+            intersection: { threshold: 0.1 },
+            uniforms: {        
+              mode: 2,
+              width: 0.2,
+              layers: 3,
+              speed: 0.8, // Increased from 0.3 to 0.8
+              delay: 0,        
+            }
+          });  
+        }
     </script>
 </body>
 </html>
