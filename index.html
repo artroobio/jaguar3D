@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jaguar Fitness</title>
     
-    <!-- 1. GOOGLE FONTS: KANIT (Extra Bold) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@900&display=swap" rel="stylesheet">
+    <!-- NO EXTERNAL FONT LINKS - 100% OFFLINE -->
 
     <style>
         /* --- GLOBAL STYLES --- */
@@ -35,22 +32,43 @@
             display: block;
             text-align: center;
             
-            /* Reverted to Solid Color */
+            /* Solid Color */
             color: #f4b63f;
             
-            /* Font Settings */
-            font-family: 'Kanit', sans-serif;
-            font-weight: 900; 
-            font-style: italic; /* Italic adds momentum/speed often used in fitness */
+            /* FONT SETTINGS: SYSTEM FONTS
+               Impact is available on almost all Windows/Mac machines.
+               If not found, it falls back to other heavy fonts.
+            */
+            font-family: "Impact", "Haettenschweiler", "Franklin Gothic Bold", "Charcoal", "Helvetica Inserat", "Bitstream Vera Sans Bold", "Arial Black", sans-serif;
+            font-weight: normal; /* Impact is already bold by default */
+            font-style: normal;
             
-            /* Adjusted size for two lines */
-            font-size: clamp(3rem, 12vw, 18vh); 
+            /* Responsive sizing logic:
+               - clamp(min, preferred, max)
+               - Increased base rem size
+               - Increased vw heavily because Impact is a condensed font and needs to be huge to fill width
+            */
+            font-size: clamp(4rem, 20vw, 35vh); 
+            
             margin: 0;
             opacity: 0; /* Hidden initially, VFX script reveals it */
-            line-height: 0.9; /* Tighter line height for impact */
+            line-height: 0.9; 
             text-transform: uppercase; 
-            padding: 0.2em;
-            letter-spacing: 0.05em;
+            
+            /* Reduced padding to allow text to get closer to edges */
+            padding: 0.1em;
+            
+            letter-spacing: 0.02em;
+        }
+
+        /* --- MOBILE OPTIMIZATION --- */
+        /* Force extremely large text on portrait mobile devices */
+        @media (max-width: 600px) {
+            h2 {
+                /* Impact is narrow, so we can go very high on VW to fill the screen width */
+                font-size: 24vw; 
+                line-height: 0.85;
+            }
         }
     </style>
 </head>
@@ -103,7 +121,7 @@
         }
 
         float toRangeT(vec2 p, float scale) {
-          // Mode 2 (Radial) hardcoded for simplicity in this version
+          // Mode 2 (Radial)
           return length(p) / scale; 
         }
 
@@ -171,13 +189,14 @@
         for (const e of document.querySelectorAll('h2')) {      
           vfx.add(e, { 
             shader, 
-            overflow: 300, 
+            /* High overflow to prevent clipping */
+            overflow: 500, 
             intersection: { threshold: 0.1 },
             uniforms: {        
               mode: 2,
               width: 0.2,
               layers: 3,
-              speed: 0.8, // Increased from 0.3 to 0.8
+              speed: 0.8, 
               delay: 0,        
             }
           });  
